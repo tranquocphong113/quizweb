@@ -265,6 +265,28 @@ if (createRoomBtn) {
   });
 }
 
+function isCurrentUserHost() {
+  if (!appState.currentUser || !appState.currentRoom) {
+    return false;
+  }
+
+  return appState.currentUser.name === appState.currentRoom.hostName;
+}
+
+function updateStartButtonByRole() {
+  const startQuizBtn = document.getElementById("startQuizBtn");
+
+  if (!startQuizBtn) return;
+
+  if (isCurrentUserHost()) {
+    startQuizBtn.classList.remove("hidden");
+    startQuizBtn.disabled = false;
+  } else {
+    startQuizBtn.classList.add("hidden");
+    startQuizBtn.disabled = true;
+  }
+}
+
 function renderWaitingRoom() {
   const roomCodeText = document.getElementById("roomCodeText");
   const playerList = document.getElementById("playerList");
@@ -288,21 +310,21 @@ function renderWaitingRoom() {
   if (playerCountText) {
     playerCountText.textContent = `${appState.currentRoom.players.length} người đã tham gia`;
   }
+  updateStartButtonByRole();
 }
 let playerPollInterval = null;
 function startPlayerPolling() {
   stopPlayerPolling();
+
   playerPollInterval = setInterval(async function () {
     if (!appState.currentRoom || !appState.currentRoom.id) return;
+
     try {
       const result = await api.pollPlayers(appState.currentRoom.id);
+
       if (result.success) {
-        const currentPlayers = appState.currentRoom.players;
-        const newPlayers = result.players;
-        if (newPlayers.length !== currentPlayers.length) {
-          appState.currentRoom.players = newPlayers;
-          renderWaitingRoom();
-        }
+        appState.currentRoom.players = result.players;
+        renderWaitingRoom();
       }
     } catch (error) {
       console.log("Lỗi polling players:", error);
@@ -320,12 +342,14 @@ function stopPlayerPolling() {
 let leaderboardPollInterval = null;
 function startLeaderboardPolling() {
   stopLeaderboardPolling();
+
   leaderboardPollInterval = setInterval(async function () {
     if (!appState.currentRoom || !appState.currentRoom.id) return;
+
     try {
       await renderResultLeaderboard();
     } catch (error) {
-      console.log("Lỗi polling leaderboard:", error);
+      console.log("Lỗi cập nhật bảng xếp hạng:", error);
     }
   }, 1000);
 }
@@ -431,12 +455,18 @@ const startQuizBtn = document.getElementById("startQuizBtn");
 
 if (startQuizBtn) {
   startQuizBtn.addEventListener("click", function () {
+    if (!isCurrentUserHost()) {
+      alert("Chỉ host mới được bắt đầu phòng quiz");
+      return;
+    }
+
     appState.game.currentQuestionIndex = 0;
     appState.game.score = 0;
     appState.game.selected = false;
     appState.game.isFinished = false;
 
     stopPlayerPolling();
+
     renderQuestion();
     showScreen("screen-play-quiz");
     startQuizTimer();
@@ -586,9 +616,8 @@ async function showResult(message = "") {
 
   showScreen("screen-result");
 
-  setTimeout(function () {
-    renderResultLeaderboard();
-  }, 100);
+  await renderResultLeaderboard();
+  startLeaderboardPolling();
 }
 
 /* Lịch sử quiz */
