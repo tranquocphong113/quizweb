@@ -207,6 +207,24 @@ if ($action === "join") {
     exit;
 }
 
+if ($action === "poll_players"){
+    $roomId = intval($input["room_id"] ?? 0);
+    if ($roomId <= 0){
+        echo json_encode([
+            "success" => false,
+            "message" => "Thiếu room_id"
+        ]);
+        exit;
+    }
+    $players = getPlayersByRoom($conn, $roomId);
+    echo json_encode([
+        "success"=>true,
+        "players"=>$players,
+        "count"=>count($players)
+    ]);
+    exit;
+}
+
 echo json_encode([
     "success" => false,
     "message" => "Action không hợp lệ"

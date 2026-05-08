@@ -15,6 +15,12 @@ function showScreen(screenId) {
 
 document.querySelectorAll("[data-screen]").forEach((button) => {
   button.addEventListener("click", function () {
+    if (this.dataset.screen === "screen-dashboard") {
+      stopPlayerPolling();
+      stopLeaderboardPolling();
+      stopQuizTimer();
+    }
+
     showScreen(this.dataset.screen);
   });
 });
@@ -251,6 +257,7 @@ if (createRoomBtn) {
 
       renderWaitingRoom();
       showScreen("screen-waiting-room");
+      startPlayerPolling();
     } catch (error) {
       console.log("Lỗi tạo phòng:", error);
       alert("Đã xảy ra lỗi khi tạo phòng");
@@ -276,6 +283,58 @@ function renderWaitingRoom() {
 
     playerList.appendChild(div);
   });
+
+  const playerCountText = document.getElementById("playerCountText");
+  if (playerCountText) {
+    playerCountText.textContent = `${appState.currentRoom.players.length} người đã tham gia`;
+  }
+}
+let playerPollInterval = null;
+function startPlayerPolling() {
+  stopPlayerPolling();
+  playerPollInterval = setInterval(async function () {
+    if (!appState.currentRoom || !appState.currentRoom.id) return;
+    try {
+      const result = await api.pollPlayers(appState.currentRoom.id);
+      if (result.success) {
+        const currentPlayers = appState.currentRoom.players;
+        const newPlayers = result.players;
+        if (newPlayers.length !== currentPlayers.length) {
+          appState.currentRoom.players = newPlayers;
+          renderWaitingRoom();
+        }
+      }
+    } catch (error) {
+      console.log("Lỗi polling players:", error);
+    }
+  }, 1000);
+}
+
+function stopPlayerPolling() {
+  if (playerPollInterval !== null) {
+    clearInterval(playerPollInterval);
+    playerPollInterval = null;
+  }
+}
+/* ===== POLLING: Cập nhật leaderboard theo thời gian thực ===== */
+let leaderboardPollInterval = null;
+function startLeaderboardPolling() {
+  stopLeaderboardPolling();
+  leaderboardPollInterval = setInterval(async function () {
+    if (!appState.currentRoom || !appState.currentRoom.id) return;
+    try {
+      await renderResultLeaderboard();
+    } catch (error) {
+      console.log("Lỗi polling leaderboard:", error);
+    }
+  }, 1000);
+}
+
+function stopLeaderboardPolling() {
+  if (leaderboardPollInterval !== null) {
+    clearInterval(leaderboardPollInterval);
+    leaderboardPollInterval = null;
+  }
 }
 
 /* Tham gia phòng */
@@ -310,6 +369,7 @@ if (joinRoomBtn) {
 
     renderWaitingRoom();
     showScreen("screen-waiting-room");
+    startPlayerPolling();
   });
 }
 
@@ -376,6 +436,7 @@ if (startQuizBtn) {
     appState.game.selected = false;
     appState.game.isFinished = false;
 
+    stopPlayerPolling();
     renderQuestion();
     showScreen("screen-play-quiz");
     startQuizTimer();

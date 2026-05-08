@@ -95,4 +95,18 @@ export const api = {
       email: email,
     });
   },
+
+  async pollPlayers(roomId) {
+    return await postJSON("api/room.php", {
+      action: "poll_players",
+      room_id: roomId,
+    });
+  },
+
+  async pollLeaderboard(roomId) {
+    return await postJSON("api/score.php", {
+      action: "leaderboard",
+      room_id: roomId,
+    });
+  },
 };
