@@ -75,6 +75,13 @@ Dự án được xây dựng với giao diện đơn giản, dễ sử dụng v
 ```text
 quiz-online-website/
 │
+├──api/
+│    ├── auth.php
+│    ├── db.php
+│    ├── quiz.php
+│    ├── room.php
+│    └── score.php
+│
 ├── css/
 │   ├── style.css
 │   ├── auth.css
