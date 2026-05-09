@@ -1,4 +1,6 @@
 <?php
+header("Content-Type: application/json; charset=utf-8");
+
 require_once "db.php";
 
 $input = json_decode(file_get_contents("php://input"), true);
@@ -75,6 +77,13 @@ function getPlayersByRoom($conn, $roomId) {
     return $players;
 }
 
+function getRoomById($conn, $roomId) {
+    $stmt = $conn->prepare("SELECT * FROM rooms WHERE id = ?");
+    $stmt->execute([$roomId]);
+    return $stmt->fetch(PDO::FETCH_ASSOC);
+}
+
+/* Tạo phòng */
 if ($action === "create") {
     $quizId = intval($input["quiz_id"] ?? 0);
     $hostName = trim($input["host_name"] ?? "");
@@ -111,16 +120,16 @@ if ($action === "create") {
 
             $check = $conn->prepare("SELECT id FROM rooms WHERE room_code = ?");
             $check->execute([$roomCode]);
-        } while ($check->rowCount() > 0);
+            $existedRoom = $check->fetch(PDO::FETCH_ASSOC);
+        } while ($existedRoom);
 
         $stmt = $conn->prepare("
-            INSERT INTO rooms (quiz_id, room_code, host_name)
-            VALUES (?, ?, ?)
+            INSERT INTO rooms (quiz_id, room_code, host_name, status)
+            VALUES (?, ?, ?, 'waiting')
         ");
-
         $stmt->execute([$quizId, $roomCode, $hostName]);
 
-        $roomId = $conn->lastInsertId();
+        $roomId = intval($conn->lastInsertId());
 
         $playerStmt = $conn->prepare("
             INSERT IGNORE INTO room_players (room_id, player_name)
@@ -132,9 +141,10 @@ if ($action === "create") {
             "success" => true,
             "message" => "Tạo phòng thành công",
             "room" => [
-                "id" => intval($roomId),
+                "id" => $roomId,
                 "code" => $roomCode,
                 "hostName" => $hostName,
+                "status" => "waiting",
                 "players" => getPlayersByRoom($conn, $roomId),
                 "quiz" => $quiz
             ]
@@ -150,6 +160,7 @@ if ($action === "create") {
     }
 }
 
+/* Tham gia phòng */
 if ($action === "join") {
     $roomCode = strtoupper(trim($input["room_code"] ?? ""));
     $playerName = trim($input["player_name"] ?? "");
@@ -170,59 +181,178 @@ if ($action === "join") {
         exit;
     }
 
-    $stmt = $conn->prepare("SELECT * FROM rooms WHERE room_code = ?");
-    $stmt->execute([$roomCode]);
+    try {
+        $stmt = $conn->prepare("SELECT * FROM rooms WHERE room_code = ?");
+        $stmt->execute([$roomCode]);
+        $room = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    $room = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$room) {
+            echo json_encode([
+                "success" => false,
+                "message" => "Không tìm thấy phòng"
+            ]);
+            exit;
+        }
 
-    if (!$room) {
+        $roomId = intval($room["id"]);
+
+        $playerStmt = $conn->prepare("
+            INSERT IGNORE INTO room_players (room_id, player_name)
+            VALUES (?, ?)
+        ");
+        $playerStmt->execute([$roomId, $playerName]);
+
+        $quiz = getQuizWithQuestions($conn, intval($room["quiz_id"]));
+
+        echo json_encode([
+            "success" => true,
+            "message" => "Tham gia phòng thành công",
+            "room" => [
+                "id" => $roomId,
+                "code" => $room["room_code"],
+                "hostName" => $room["host_name"],
+                "status" => $room["status"] ?? "waiting",
+                "players" => getPlayersByRoom($conn, $roomId),
+                "quiz" => $quiz
+            ]
+        ]);
+        exit;
+    } catch (Exception $e) {
         echo json_encode([
             "success" => false,
-            "message" => "Không tìm thấy phòng"
+            "message" => "Lỗi tham gia phòng",
+            "error" => $e->getMessage()
         ]);
         exit;
     }
-
-    $roomId = intval($room["id"]);
-
-    $playerStmt = $conn->prepare("
-        INSERT IGNORE INTO room_players (room_id, player_name)
-        VALUES (?, ?)
-    ");
-    $playerStmt->execute([$roomId, $playerName]);
-
-    $quiz = getQuizWithQuestions($conn, intval($room["quiz_id"]));
-
-    echo json_encode([
-        "success" => true,
-        "message" => "Tham gia phòng thành công",
-        "room" => [
-            "id" => $roomId,
-            "code" => $room["room_code"],
-            "hostName" => $room["host_name"],
-            "players" => getPlayersByRoom($conn, $roomId),
-            "quiz" => $quiz
-        ]
-    ]);
-    exit;
 }
 
-if ($action === "poll_players"){
+/* Cập nhật danh sách người chơi + trạng thái phòng */
+if ($action === "poll_players") {
     $roomId = intval($input["room_id"] ?? 0);
-    if ($roomId <= 0){
+
+    if ($roomId <= 0) {
         echo json_encode([
             "success" => false,
             "message" => "Thiếu room_id"
         ]);
         exit;
     }
-    $players = getPlayersByRoom($conn, $roomId);
-    echo json_encode([
-        "success"=>true,
-        "players"=>$players,
-        "count"=>count($players)
-    ]);
-    exit;
+
+    try {
+        $roomStmt = $conn->prepare("SELECT status FROM rooms WHERE id = ?");
+        $roomStmt->execute([$roomId]);
+        $room = $roomStmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$room) {
+            echo json_encode([
+                "success" => false,
+                "message" => "Không tìm thấy phòng"
+            ]);
+            exit;
+        }
+
+        $players = getPlayersByRoom($conn, $roomId);
+
+        echo json_encode([
+            "success" => true,
+            "players" => $players,
+            "count" => count($players),
+            "status" => $room["status"] ?? "waiting"
+        ]);
+        exit;
+    } catch (Exception $e) {
+        echo json_encode([
+            "success" => false,
+            "message" => "Lỗi cập nhật danh sách người chơi",
+            "error" => $e->getMessage()
+        ]);
+        exit;
+    }
+}
+
+/* Host bấm bắt đầu phòng */
+if ($action === "start_room") {
+    $roomId = intval($input["room_id"] ?? 0);
+
+    if ($roomId <= 0) {
+        echo json_encode([
+            "success" => false,
+            "message" => "Thiếu room_id"
+        ]);
+        exit;
+    }
+
+    try {
+        $room = getRoomById($conn, $roomId);
+
+        if (!$room) {
+            echo json_encode([
+                "success" => false,
+                "message" => "Không tìm thấy phòng"
+            ]);
+            exit;
+        }
+
+        $stmt = $conn->prepare("
+            UPDATE rooms
+            SET status = 'started'
+            WHERE id = ?
+        ");
+        $stmt->execute([$roomId]);
+
+        echo json_encode([
+            "success" => true,
+            "message" => "Phòng đã bắt đầu",
+            "status" => "started"
+        ]);
+        exit;
+    } catch (Exception $e) {
+        echo json_encode([
+            "success" => false,
+            "message" => "Lỗi bắt đầu phòng",
+            "error" => $e->getMessage()
+        ]);
+        exit;
+    }
+}
+
+/* Participant kiểm tra phòng đã bắt đầu chưa */
+if ($action === "poll_room_status") {
+    $roomId = intval($input["room_id"] ?? 0);
+
+    if ($roomId <= 0) {
+        echo json_encode([
+            "success" => false,
+            "message" => "Thiếu room_id"
+        ]);
+        exit;
+    }
+
+    try {
+        $room = getRoomById($conn, $roomId);
+
+        if (!$room) {
+            echo json_encode([
+                "success" => false,
+                "message" => "Không tìm thấy phòng"
+            ]);
+            exit;
+        }
+
+        echo json_encode([
+            "success" => true,
+            "status" => $room["status"] ?? "waiting"
+        ]);
+        exit;
+    } catch (Exception $e) {
+        echo json_encode([
+            "success" => false,
+            "message" => "Lỗi kiểm tra trạng thái phòng",
+            "error" => $e->getMessage()
+        ]);
+        exit;
+    }
 }
 
 echo json_encode([

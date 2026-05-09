@@ -1,30 +1,24 @@
-const USER_KEY = "quiz_users";
-const ROOM_KEY = "quiz_room";
-const SCORE_KEY = "quiz_scores";
-
-function readStorage(key, defaultValue) {
-  const data = localStorage.getItem(key);
-  return data ? JSON.parse(data) : defaultValue;
-}
-
-function writeStorage(key, value) {
-  localStorage.setItem(key, JSON.stringify(value));
-}
-
-function createRoomCode() {
-  return Math.random().toString(36).substring(2, 8).toUpperCase();
-}
-
 async function postJSON(url, data) {
   const response = await fetch(url, {
     method: "POST",
+    cache: "no-store",
     headers: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify(data),
   });
 
-  return await response.json();
+  const text = await response.text();
+
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    console.log("API trả về không phải JSON:", text);
+    return {
+      success: false,
+      message: "API lỗi hoặc trả về dữ liệu không hợp lệ",
+    };
+  }
 }
 
 export const api = {
@@ -44,6 +38,7 @@ export const api = {
       password: password,
     });
   },
+
   async createQuiz(quiz, userId) {
     return await postJSON("api/quiz.php", {
       action: "create",
@@ -70,6 +65,27 @@ export const api = {
     });
   },
 
+  async pollPlayers(roomId) {
+    return await postJSON("api/room.php", {
+      action: "poll_players",
+      room_id: roomId,
+    });
+  },
+
+  async startRoom(roomId) {
+    return await postJSON("api/room.php", {
+      action: "start_room",
+      room_id: roomId,
+    });
+  },
+
+  async pollRoomStatus(roomId) {
+    return await postJSON("api/room.php", {
+      action: "poll_room_status",
+      room_id: roomId,
+    });
+  },
+
   async saveScore(data) {
     return await postJSON("api/score.php", {
       action: "save",
@@ -89,24 +105,17 @@ export const api = {
     });
   },
 
-  async getHistoryByUser(email) {
-    return await postJSON("api/score.php", {
-      action: "history",
-      email: email,
-    });
-  },
-
-  async pollPlayers(roomId) {
-    return await postJSON("api/room.php", {
-      action: "poll_players",
-      room_id: roomId,
-    });
-  },
-
   async pollLeaderboard(roomId) {
     return await postJSON("api/score.php", {
       action: "leaderboard",
       room_id: roomId,
+    });
+  },
+
+  async getHistoryByUser(email) {
+    return await postJSON("api/score.php", {
+      action: "history",
+      email: email,
     });
   },
 };
