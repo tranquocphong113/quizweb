@@ -95,7 +95,13 @@ quiz-online-website/
 │
 ├── js/
 │   └── app.js
-│
+│   └── auth.js
+│   └── gameplay.js
+│   └── quiz-create.js
+│   └── result.js
+│   └── room.js
+│   └── ui.js
+│ 
 ├── model/
 │   ├── api.js
 │   └── state.js
