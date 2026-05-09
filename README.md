@@ -2,10 +2,11 @@
 
 ## 1. Giới thiệu
 
-Quiz Online Website là một website làm bài trắc nghiệm trực tuyến được xây dựng cho môn Lập Trình Web.  
+Quiz Online Website là một website làm bài trắc nghiệm trực tuyến được xây dựng cho môn Lập Trình Web.
+
 Hệ thống cho phép người dùng đăng ký, đăng nhập, tạo quiz, tạo phòng chơi, tham gia phòng bằng mã phòng, làm bài có giới hạn thời gian, xem kết quả, bảng xếp hạng và lịch sử làm bài.
 
-Dự án được xây dựng với giao diện đơn giản, dễ sử dụng và phù hợp để demo các chức năng cơ bản của một hệ thống quiz online.
+Dự án được xây dựng với giao diện đơn giản, dễ sử dụng và phù hợp để demo các chức năng cơ bản của một hệ thống quiz online theo mô hình Host - Participant.
 
 ---
 
@@ -41,6 +42,8 @@ Dự án được xây dựng với giao diện đơn giản, dễ sử dụng v
 - Sinh mã phòng ngẫu nhiên
 - Tham gia phòng bằng mã phòng
 - Hiển thị danh sách người chơi trong phòng chờ
+- Chỉ Host được quyền bắt đầu phòng quiz
+- Participant tự động vào bài khi Host bắt đầu phòng
 
 ### Làm bài
 
@@ -55,6 +58,7 @@ Dự án được xây dựng với giao diện đơn giản, dễ sử dụng v
 - Hiển thị số câu đúng / tổng số câu
 - Hiển thị tỉ lệ phần trăm câu đúng
 - Hiển thị bảng xếp hạng của phòng hiện tại
+- Bảng xếp hạng được cập nhật bằng cơ chế polling
 - Lưu lịch sử làm bài theo từng tài khoản
 
 ---
@@ -65,7 +69,8 @@ Dự án được xây dựng với giao diện đơn giản, dễ sử dụng v
 - CSS
 - JavaScript
 - PHP
-- LocalStorage
+- MySQL
+- phpMyAdmin
 - XAMPP / Apache
 
 ---
@@ -75,12 +80,12 @@ Dự án được xây dựng với giao diện đơn giản, dễ sử dụng v
 ```text
 quiz-online-website/
 │
-├──api/
-│    ├── auth.php
-│    ├── db.php
-│    ├── quiz.php
-│    ├── room.php
-│    └── score.php
+├── api/
+│   ├── auth.php
+│   ├── db.php
+│   ├── quiz.php
+│   ├── room.php
+│   └── score.php
 │
 ├── css/
 │   ├── style.css
@@ -96,5 +101,4 @@ quiz-online-website/
 │   └── state.js
 │
 ├── index.php
-├── README.md
-└── quiz.html
+└── README.md
